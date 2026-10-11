@@ -1,0 +1,75 @@
+server:
+  port: ${SLUICE_GATEWAY_PORT:8080}
+  shutdown: graceful
+  max-http-request-header-size: 16KB
+  tomcat:
+    max-connections: 20000
+    accept-count: 2000
+    connection-timeout: 20s
+    keep-alive-timeout: 30s
+    max-keep-alive-requests: 10000
+
+spring:
+  application:
+    name: sluice
+  main:
+    banner-mode: "off"
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: ${SLUICE_DRAIN_TIMEOUT:30s}
+  datasource:
+    url: ${SLUICE_DB_URL:jdbc:postgresql://localhost:5432/sluice}
+    username: ${SLUICE_DB_USER:sluice}
+    password: ${SLUICE_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${SLUICE_DB_POOL_SIZE:10}
+      connection-timeout: 3000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${SLUICE_REDIS_HOST:localhost}
+      port: ${SLUICE_REDIS_PORT:6379}
+      timeout: ${SLUICE_REDIS_TIMEOUT:300ms}
+      connect-timeout: 500ms
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: true
+
+sluice:
+  admin:
+    port: ${SLUICE_ADMIN_PORT:9090}
+    token: ${SLUICE_ADMIN_TOKEN:}
+  security:
+    api-key-secret: ${SLUICE_API_KEY_SECRET:}
+    max-request-body-bytes: ${SLUICE_MAX_REQUEST_BODY_BYTES:10485760}
+    max-upstream-timeout-ms: ${SLUICE_MAX_UPSTREAM_TIMEOUT_MS:60000}
+    trust-forwarded-for: ${SLUICE_TRUST_FORWARDED_FOR:false}
+  rate-limit:
+    fail-mode: ${SLUICE_RATELIMIT_FAIL_MODE:OPEN}
+    key-prefix: ${SLUICE_RATELIMIT_KEY_PREFIX:sluice:rl:}
+  config:
+    poll-interval-ms: ${SLUICE_CONFIG_POLL_INTERVAL_MS:5000}
+    channel: ${SLUICE_CONFIG_CHANNEL:sluice:config:updates}
+    bootstrap-path: ${SLUICE_BOOTSTRAP_CONFIG:}
+  gateway:
+    via-token: ${SLUICE_VIA_TOKEN:sluice}
+    health-tick-ms: ${SLUICE_HEALTH_TICK_MS:500}
+    canary-eval-interval-ms: ${SLUICE_CANARY_EVAL_INTERVAL_MS:5000}
+    retired-pool-grace-ms: ${SLUICE_RETIRED_POOL_GRACE_MS:30000}
+  cache:
+    key-prefix: ${SLUICE_CACHE_KEY_PREFIX:sluice:cache:}
+    coalesce-wait-ms: ${SLUICE_CACHE_COALESCE_WAIT_MS:10000}
+
+logging:
+  level:
+    root: INFO
+    org.apache.hc.client5: WARN
+    org.apache.catalina: WARN
