@@ -1,5 +1,6 @@
 package com.sluice.config;
 
+import com.sluice.auth.JwtVerifier;
 import com.sluice.infra.SsrfGuard;
 import com.sluice.routing.PathNormalizer;
 import com.sluice.schema.AuthMode;
@@ -19,11 +20,14 @@ import com.sluice.schema.TenantConfig;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -36,9 +40,16 @@ public class ConfigValidator {
     private static final long MAX_CACHE_BODY_BYTES = 64L * 1024 * 1024;
 
     private final SluiceProperties properties;
+    private final Function<String, String> environment;
 
+    @Autowired
     public ConfigValidator(SluiceProperties properties) {
+        this(properties, System::getenv);
+    }
+
+    public ConfigValidator(SluiceProperties properties, Function<String, String> environment) {
         this.properties = properties;
+        this.environment = environment;
     }
 
     public void validateOrThrow(ConfigDocument document) {
@@ -307,6 +318,13 @@ public class ConfigValidator {
         }
         if (jwt.algorithm() == JwtAlgorithm.RS256 && (jwt.jwksPath() == null || jwt.jwksPath().isBlank())) {
             errors.add(where + ": auth.jwt.jwksPath is required for RS256");
+        }
+        if (errors.stream().noneMatch(error -> error.startsWith(where + ": auth.jwt"))) {
+            try {
+                JwtVerifier.create(jwt, Clock.systemUTC(), environment);
+            } catch (Exception e) {
+                errors.add(where + ": auth.jwt cannot be loaded: " + e.getMessage());
+            }
         }
     }
 
