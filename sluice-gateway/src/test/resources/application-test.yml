@@ -18,7 +18,7 @@ sluice:
   gateway:
     health-tick-ms: 100
     canary-eval-interval-ms: 200
-    retired-pool-grace-ms: 500
+    retired-pool-grace-ms: 5000
 
 logging:
   level:
