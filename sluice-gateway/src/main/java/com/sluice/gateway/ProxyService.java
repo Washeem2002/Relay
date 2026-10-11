@@ -159,9 +159,9 @@ public class ProxyService {
             state.circuit().recordSuccess();
         }
         if (status == 502 || status == 503 || status == 504) {
-            state.recordHealthFailure(pool.config().ejectAfterFailures(), pool.config().ejectDurationMs());
+            state.recordPassiveFailure(pool.config().ejectAfterFailures(), pool.config().ejectDurationMs());
         } else {
-            state.recordHealthSuccess();
+            state.recordPassiveSuccess();
         }
     }
 
@@ -184,7 +184,7 @@ public class ProxyService {
                     Map.of("Retry-After", "1"));
         }
         state.circuit().recordFailure();
-        state.recordHealthFailure(pool.config().ejectAfterFailures(), pool.config().ejectDurationMs());
+        state.recordPassiveFailure(pool.config().ejectAfterFailures(), pool.config().ejectDurationMs());
         if (failure instanceof ConnectTimeoutException || failure instanceof SocketTimeoutException
                 || failure instanceof InterruptedIOException) {
             return new GatewayException(504, "upstream_timeout", "upstream did not respond in time");
