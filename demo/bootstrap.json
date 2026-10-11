@@ -1,0 +1,65 @@
+{
+  "pools": [
+    {
+      "name": "demo-stable",
+      "algorithm": "WEIGHTED_ROUND_ROBIN",
+      "allowPrivateTargets": true,
+      "healthPath": "/health",
+      "healthIntervalMs": 2000,
+      "ejectAfterFailures": 2,
+      "ejectDurationMs": 10000,
+      "maxConnections": 100,
+      "maxConcurrency": 200,
+      "circuitBreaker": {
+        "failureRatePercent": 50,
+        "windowSeconds": 30,
+        "minRequests": 6,
+        "cooldownMs": 8000,
+        "halfOpenMaxProbes": 1
+      },
+      "targets": [
+        {"id": "a", "url": "http://upstream-a:9000", "weight": 1},
+        {"id": "b", "url": "http://upstream-b:9000", "weight": 1}
+      ]
+    },
+    {
+      "name": "demo-canary",
+      "allowPrivateTargets": true,
+      "healthPath": "/health",
+      "targets": [
+        {"id": "c", "url": "http://upstream-c:9000", "weight": 1}
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "name": "demo",
+      "pathPrefix": "/demo",
+      "stripPrefix": true,
+      "pool": "demo-stable",
+      "timeoutMs": 5000,
+      "auth": {"mode": "API_KEY"},
+      "retry": {"maxAttempts": 2}
+    },
+    {
+      "name": "content",
+      "pathPrefix": "/content",
+      "stripPrefix": true,
+      "pool": "demo-stable",
+      "timeoutMs": 5000,
+      "cachePolicy": "content-cache"
+    }
+  ],
+  "plans": [
+    {
+      "name": "demo-plan",
+      "rateLimit": {"algorithm": "SLIDING_WINDOW", "limit": 5, "windowSeconds": 10}
+    }
+  ],
+  "tenants": [
+    {"id": "demo", "name": "Demo tenant", "plan": "demo-plan"}
+  ],
+  "cachePolicies": [
+    {"name": "content-cache", "ttlSeconds": 10, "staleWhileRevalidateSeconds": 30}
+  ]
+}
