@@ -1,9 +1,12 @@
 package com.sluice.config;
 
+import com.sluice.canary.CanaryMonitor;
 import com.sluice.observability.SluiceMetrics;
+import com.sluice.routing.CompiledRoute;
 import com.sluice.routing.RoutingSnapshot;
 import com.sluice.routing.SnapshotCompiler;
 import com.sluice.routing.SnapshotHolder;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,18 +32,21 @@ public class ConfigReloader {
     private final SluiceMetrics metrics;
     private final StringRedisTemplate redis;
     private final SluiceProperties properties;
+    private final CanaryMonitor canaryMonitor;
     private volatile boolean initialLoadComplete;
     private volatile String lastError;
     private volatile long failedVersion = -1;
 
     public ConfigReloader(ConfigService configService, SnapshotHolder holder, SnapshotCompiler compiler,
-                          SluiceMetrics metrics, StringRedisTemplate redis, SluiceProperties properties) {
+                          SluiceMetrics metrics, StringRedisTemplate redis, SluiceProperties properties,
+                          CanaryMonitor canaryMonitor) {
         this.configService = configService;
         this.holder = holder;
         this.compiler = compiler;
         this.metrics = metrics;
         this.redis = redis;
         this.properties = properties;
+        this.canaryMonitor = canaryMonitor;
     }
 
     public boolean isInitialLoadComplete() {
@@ -69,8 +75,9 @@ public class ConfigReloader {
         }
         try {
             RoutingSnapshot snapshot = compiler.compile(config.version(), config.document());
-            holder.install(snapshot);
+            RoutingSnapshot previous = holder.install(snapshot);
             compiler.prune(snapshot);
+            resetChangedCanaries(previous, snapshot);
             metrics.configVersion(config.version());
             lastError = null;
             failedVersion = -1;
@@ -83,6 +90,15 @@ public class ConfigReloader {
             LOG.error("config version {} rejected, keeping version {}: {}", config.version(), holder.version(),
                     e.getMessage());
             return Outcome.FAILED;
+        }
+    }
+
+    private void resetChangedCanaries(RoutingSnapshot previous, RoutingSnapshot current) {
+        for (CompiledRoute route : previous.routes().values()) {
+            CompiledRoute next = current.routes().get(route.name());
+            if (next == null || !Objects.equals(route.config().canary(), next.config().canary())) {
+                canaryMonitor.reset(route.name());
+            }
         }
     }
 
