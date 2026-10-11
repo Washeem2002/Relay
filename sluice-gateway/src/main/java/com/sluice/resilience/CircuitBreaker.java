@@ -75,6 +75,12 @@ public final class CircuitBreaker {
         }
     }
 
+    public synchronized void releasePermit() {
+        if (state == CircuitState.HALF_OPEN && probesInFlight > 0) {
+            probesInFlight--;
+        }
+    }
+
     public synchronized CircuitState state() {
         return state;
     }
