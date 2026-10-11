@@ -192,7 +192,7 @@ public final class MockUpstream implements AutoCloseable {
         long version = cacheableVersion.incrementAndGet();
         int ttl = intParam(query, "ttl", 60);
         sleep(intParam(query, "delayMs", 0));
-        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=" + ttl);
+        exchange.getResponseHeaders().set("Cache-Control", query.getOrDefault("cc", "public, max-age=" + ttl));
         respond(exchange, 200, "{\"upstream\":\"" + name + "\",\"version\":" + version + "}", "application/json");
     }
 
