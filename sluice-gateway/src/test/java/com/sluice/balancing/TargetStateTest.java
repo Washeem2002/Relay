@@ -13,16 +13,31 @@ class TargetStateTest {
     void ejectsAfterConsecutiveFailuresAndReturnsAfterRecovery() {
         MutableClock clock = new MutableClock();
         TargetState state = new TargetState("p", "t", CircuitBreakerConfig.defaults(), clock);
-        state.recordHealthFailure(3, 10_000);
-        state.recordHealthFailure(3, 10_000);
+        state.recordPassiveFailure(3, 10_000);
+        state.recordPassiveFailure(3, 10_000);
         assertThat(state.isSelectable()).isTrue();
-        state.recordHealthFailure(3, 10_000);
+        state.recordPassiveFailure(3, 10_000);
         assertThat(state.isSelectable()).isFalse();
         assertThat(state.healthStatus()).isEqualTo(HealthStatus.EJECTED);
         clock.advance(Duration.ofSeconds(10));
         assertThat(state.healthStatus()).isEqualTo(HealthStatus.PROBATION);
         assertThat(state.isSelectable()).isTrue();
-        state.recordHealthSuccess();
+        state.recordPassiveSuccess();
+        assertThat(state.healthStatus()).isEqualTo(HealthStatus.HEALTHY);
+        assertThat(state.consecutiveFailures()).isZero();
+    }
+
+    @Test
+    void probeFailuresAreNotResetByPassiveSuccesses() {
+        TargetState state = new TargetState("p", "t", CircuitBreakerConfig.defaults(), new MutableClock());
+        state.recordProbeFailure(2, 60_000);
+        state.recordPassiveSuccess();
+        state.recordProbeFailure(2, 60_000);
+        assertThat(state.isSelectable()).isFalse();
+        assertThat(state.consecutiveFailures()).isEqualTo(2);
+        state.recordPassiveSuccess();
+        assertThat(state.healthStatus()).isEqualTo(HealthStatus.EJECTED);
+        state.recordProbeSuccess();
         assertThat(state.healthStatus()).isEqualTo(HealthStatus.HEALTHY);
         assertThat(state.consecutiveFailures()).isZero();
     }
@@ -34,17 +49,17 @@ class TargetStateTest {
         state.eject(5_000);
         clock.advance(Duration.ofSeconds(5));
         assertThat(state.isHealthEligible()).isTrue();
-        state.recordHealthFailure(1, 5_000);
+        state.recordPassiveFailure(1, 5_000);
         assertThat(state.isSelectable()).isFalse();
     }
 
     @Test
     void successResetsFailureStreak() {
         TargetState state = new TargetState("p", "t", CircuitBreakerConfig.defaults(), new MutableClock());
-        state.recordHealthFailure(3, 1_000);
-        state.recordHealthFailure(3, 1_000);
-        state.recordHealthSuccess();
-        state.recordHealthFailure(3, 1_000);
+        state.recordPassiveFailure(3, 1_000);
+        state.recordPassiveFailure(3, 1_000);
+        state.recordPassiveSuccess();
+        state.recordPassiveFailure(3, 1_000);
         assertThat(state.isSelectable()).isTrue();
     }
 
