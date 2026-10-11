@@ -55,4 +55,10 @@ public record PoolConfig(
             circuitBreaker = CircuitBreakerConfig.defaults();
         }
     }
+
+    public PoolConfig withTargets(List<TargetConfig> newTargets) {
+        return new PoolConfig(name, algorithm, hashKey, newTargets, maxConnections, maxConcurrency, queueTimeoutMs,
+                connectTimeoutMs, healthPath, healthIntervalMs, healthTimeoutMs, ejectAfterFailures, ejectDurationMs,
+                allowPrivateTargets, circuitBreaker);
+    }
 }
