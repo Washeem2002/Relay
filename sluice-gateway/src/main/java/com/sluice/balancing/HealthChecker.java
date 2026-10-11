@@ -62,9 +62,9 @@ public class HealthChecker {
                     pool.config().healthTimeoutMs());
             metrics.healthCheck(pool.name(), target.id(), healthy);
             if (healthy) {
-                target.state().recordHealthSuccess();
+                target.state().recordProbeSuccess();
             } else {
-                target.state().recordHealthFailure(pool.config().ejectAfterFailures(), pool.config().ejectDurationMs());
+                target.state().recordProbeFailure(pool.config().ejectAfterFailures(), pool.config().ejectDurationMs());
             }
         } finally {
             inFlight.remove(key);
