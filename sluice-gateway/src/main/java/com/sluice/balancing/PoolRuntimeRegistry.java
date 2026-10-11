@@ -8,11 +8,15 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.stereotype.Component;
 
 @Component
 public class PoolRuntimeRegistry {
+
+    private static final long RETIREMENT_POLL_MILLIS = 200;
 
     private final Map<String, PoolRuntime> runtimes = new ConcurrentHashMap<>();
     private final ScheduledExecutorService retirement = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -57,6 +61,13 @@ public class PoolRuntimeRegistry {
     }
 
     private void retire(PoolRuntime runtime) {
-        retirement.schedule(runtime::close, graceMillis, TimeUnit.MILLISECONDS);
+        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(graceMillis);
+        AtomicReference<ScheduledFuture<?>> task = new AtomicReference<>();
+        task.set(retirement.scheduleWithFixedDelay(() -> {
+            if (runtime.bulkhead().inFlight() == 0 || System.nanoTime() >= deadlineNanos) {
+                runtime.close();
+                task.get().cancel(false);
+            }
+        }, RETIREMENT_POLL_MILLIS, RETIREMENT_POLL_MILLIS, TimeUnit.MILLISECONDS));
     }
 }
