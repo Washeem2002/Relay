@@ -1,0 +1,114 @@
+x-sluice-environment: &sluice-environment
+  SLUICE_DB_URL: jdbc:postgresql://postgres:5432/sluice
+  SLUICE_DB_USER: sluice
+  SLUICE_DB_PASSWORD: ${SLUICE_DB_PASSWORD:?copy .env.example to .env}
+  SLUICE_REDIS_HOST: redis
+  SLUICE_ADMIN_TOKEN: ${SLUICE_ADMIN_TOKEN:?copy .env.example to .env}
+  SLUICE_API_KEY_SECRET: ${SLUICE_API_KEY_SECRET:?copy .env.example to .env}
+  SLUICE_RATELIMIT_FAIL_MODE: ${SLUICE_RATELIMIT_FAIL_MODE:-OPEN}
+  SLUICE_BOOTSTRAP_CONFIG: /app/demo/bootstrap.json
+  SLUICE_DRAIN_TIMEOUT: 30s
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sluice
+      POSTGRES_USER: sluice
+      POSTGRES_PASSWORD: ${SLUICE_DB_PASSWORD:?copy .env.example to .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sluice -d sluice"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "volatile-lru", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  upstream-a:
+    build:
+      context: .
+      target: mock-upstream
+    environment:
+      INSTANCE_NAME: upstream-a
+      PORT: "9000"
+
+  upstream-b:
+    build:
+      context: .
+      target: mock-upstream
+    environment:
+      INSTANCE_NAME: upstream-b
+      PORT: "9000"
+
+  upstream-c:
+    build:
+      context: .
+      target: mock-upstream
+    environment:
+      INSTANCE_NAME: upstream-c
+      PORT: "9000"
+
+  sluice:
+    build:
+      context: .
+      target: gateway
+    environment: *sluice-environment
+    volumes:
+      - ./demo:/app/demo:ro
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      upstream-a:
+        condition: service_started
+      upstream-b:
+        condition: service_started
+      upstream-c:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9090'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    stop_grace_period: 40s
+
+  sluice-2:
+    profiles: ["scale"]
+    build:
+      context: .
+      target: gateway
+    environment: *sluice-environment
+    volumes:
+      - ./demo:/app/demo:ro
+    ports:
+      - "8081:8080"
+      - "9091:9090"
+    depends_on:
+      sluice:
+        condition: service_healthy
+    stop_grace_period: 40s
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9099:9090"
+    depends_on:
+      - sluice
+
+volumes:
+  postgres-data:
