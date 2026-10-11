@@ -11,7 +11,8 @@ public final class TargetState {
     private final String targetId;
     private final Clock clock;
     private final AtomicInteger activeConnections = new AtomicInteger();
-    private final AtomicInteger consecutiveFailures = new AtomicInteger();
+    private final AtomicInteger passiveFailures = new AtomicInteger();
+    private final AtomicInteger probeFailures = new AtomicInteger();
     private volatile boolean ejected;
     private volatile long ejectedUntilMillis;
     private volatile CircuitBreaker circuit;
@@ -69,19 +70,32 @@ public final class TargetState {
     }
 
     public int consecutiveFailures() {
-        return consecutiveFailures.get();
+        return Math.max(passiveFailures.get(), probeFailures.get());
     }
 
-    public void recordHealthSuccess() {
-        consecutiveFailures.set(0);
+    public void recordPassiveSuccess() {
+        passiveFailures.set(0);
+        if (ejected && clock.millis() >= ejectedUntilMillis) {
+            ejected = false;
+            probeFailures.set(0);
+        }
+    }
+
+    public void recordPassiveFailure(int ejectAfterFailures, long ejectDurationMillis) {
+        if (passiveFailures.incrementAndGet() >= ejectAfterFailures) {
+            eject(ejectDurationMillis);
+        }
+    }
+
+    public void recordProbeSuccess() {
+        passiveFailures.set(0);
+        probeFailures.set(0);
         ejected = false;
     }
 
-    public void recordHealthFailure(int ejectAfterFailures, long ejectDurationMillis) {
-        int failures = consecutiveFailures.incrementAndGet();
-        if (failures >= ejectAfterFailures) {
-            ejectedUntilMillis = clock.millis() + ejectDurationMillis;
-            ejected = true;
+    public void recordProbeFailure(int ejectAfterFailures, long ejectDurationMillis) {
+        if (probeFailures.incrementAndGet() >= ejectAfterFailures) {
+            eject(ejectDurationMillis);
         }
     }
 
