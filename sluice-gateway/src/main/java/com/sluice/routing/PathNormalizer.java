@@ -22,6 +22,22 @@ public final class PathNormalizer {
         return result;
     }
 
+    public static String stripSegments(String rawPath, int count) {
+        int index = 0;
+        int consumed = 0;
+        int length = rawPath.length();
+        while (consumed < count && index < length) {
+            while (index < length && rawPath.charAt(index) == '/') {
+                index++;
+            }
+            while (index < length && rawPath.charAt(index) != '/') {
+                index++;
+            }
+            consumed++;
+        }
+        return rawPath.substring(index);
+    }
+
     public static boolean containsTraversal(String rawPath) {
         if (rawPath == null) {
             return false;
