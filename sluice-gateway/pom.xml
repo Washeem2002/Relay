@@ -110,6 +110,9 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
+                    <environmentVariables>
+                        <SLUICE_TEST_JWT_SECRET>jwt-test-secret-that-is-longer-than-32-bytes</SLUICE_TEST_JWT_SECRET>
+                    </environmentVariables>
                 </configuration>
             </plugin>
             <plugin>
